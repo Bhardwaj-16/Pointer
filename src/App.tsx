@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Sparkles, X, Send, Maximize } from "lucide-react";
+import { Sparkles, X, Send } from "lucide-react";
 import "./App.css";
 
 function App() {
@@ -69,13 +69,8 @@ function App() {
       <div className="bottom-row" data-tauri-drag-region>
         <div className="tags">
           <div className="tag">
-            <Maximize size={16} className="tag-icon" />
-            <span>Screen</span>
-            <div className="dot">1</div>
-          </div>
-          <div className="tag">
             <Sparkles size={16} className="tag-icon" />
-            <span>AI</span>
+            <span>ORIGIN AI</span>
             <div className="dot-small"></div>
           </div>
         </div>
