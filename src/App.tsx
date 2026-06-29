@@ -2,20 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useConvexAuth } from "convex/react";
-import { useAuthToken } from "@convex-dev/auth/react";
-import { Sparkles, X, Send, Loader2 } from "lucide-react";
+import { useAuthToken, useAuthActions } from "@convex-dev/auth/react";
+import { Sparkles, X, Send, Loader2, LogOut } from "lucide-react";
 import { Login } from "./Login";
 import "./App.css";
 
 function App() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const token = useAuthToken();
+  const { signOut } = useAuthActions();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const responseRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [aiResponse, setAiResponse] = useState<string>("");
-  const [isThinking, setIsThinking] = useState(false);
+  // "idle" | "thinking" | "streaming"
+  const [status, setStatus] = useState<"idle" | "thinking" | "streaming">("idle");
 
-  // Auto-resize textarea
+  // Auto-resize textarea (capped at 120px)
   const handleInputResize = () => {
     const el = inputRef.current;
     if (el) {
@@ -24,12 +27,12 @@ function App() {
     }
   };
 
-  // Auto-scroll response box to bottom as tokens arrive
+  // Auto-scroll to bottom of scroll area whenever response grows
   useEffect(() => {
-    if (responseRef.current && aiResponse) {
-      responseRef.current.scrollTop = responseRef.current.scrollHeight;
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
-  }, [aiResponse]);
+  }, [aiResponse, status]);
 
   // Listen for Rust activation event + window focus
   useEffect(() => {
@@ -51,26 +54,45 @@ function App() {
     catch (e) { console.error("Failed to hide:", e); }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (e) {
+      console.error("Sign-out failed:", e);
+    }
+  };
+
   const handleSend = async () => {
     const val = inputRef.current?.value?.trim() ?? "";
-    if (!val || isThinking) return;
+    if (!val || status !== "idle") return;
 
-    // Clear input immediately for fast, responsive feel
+    // ── /sign-out command ────────────────────────────────────────────
+    if (val.toLowerCase() === "/sign-out") {
+      if (inputRef.current) {
+        inputRef.current.value = "";
+        inputRef.current.style.height = "auto";
+      }
+      await handleSignOut();
+      return;
+    }
+
+    // Clear input immediately for snappy feel
     if (inputRef.current) {
       inputRef.current.value = "";
       inputRef.current.style.height = "auto";
     }
-    setIsThinking(true);
+    setStatus("thinking");
     setAiResponse("");
 
     try {
       if (!token) {
         setAiResponse("Error: Not authenticated. Please sign in again.");
+        setStatus("idle");
         return;
       }
 
       const siteUrl = import.meta.env.VITE_CONVEX_SITE_URL as string;
-      console.log("[Pointer] Prompt dispatched → awaiting stream...");
+      console.log("[Pointer] 📤 Prompt dispatched → awaiting NVIDIA stream...");
 
       const response = await fetch(`${siteUrl}/chat/stream`, {
         method: "POST",
@@ -83,12 +105,13 @@ function App() {
 
       if (!response.ok || !response.body) {
         setAiResponse(`Error ${response.status}: Failed to connect to ORIGIN AI.`);
+        setStatus("idle");
         return;
       }
 
-      // First token received — swap thinking indicator for response box
-      setIsThinking(false);
-      console.log("[Pointer] Stream open — receiving tokens...");
+      console.log("[Pointer] 📡 Stream open — receiving tokens...");
+      // Switch to streaming — keeps thinking pill visible alongside text
+      setStatus("streaming");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -99,15 +122,17 @@ function App() {
         const { done, value } = await reader.read();
         if (done) break;
 
-        // Line-buffer to handle SSE chunks that split across reads
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
+          // Skip SSE keep-alive comments (": keep-alive")
+          if (line.startsWith(":")) continue;
           if (!line.startsWith("data: ")) continue;
+
           const data = line.slice(6).trim();
-          if (data === "[DONE]") { console.log("[Pointer] Stream complete."); break; }
+          if (data === "[DONE]") { console.log("[Pointer] ✅ Stream complete."); break; }
           try {
             const parsed = JSON.parse(data);
             const delta = parsed.choices?.[0]?.delta?.content;
@@ -119,82 +144,94 @@ function App() {
         }
       }
     } catch (err: any) {
-      console.error("[Pointer] Streaming error:", err);
-      setIsThinking(false);
+      console.error("[Pointer] ❌ Streaming error:", err);
       setAiResponse("Error: " + (err.message || "Failed to reach ORIGIN AI."));
     } finally {
-      setIsThinking(false);
-      // Re-focus for the next prompt
+      setStatus("idle");
       setTimeout(() => inputRef.current?.focus(), 80);
     }
   };
 
-  // Show nothing during initial auth check (avoid flash)
   if (isLoading) return null;
-
-  // Show login screen if not authenticated
   if (!isAuthenticated) return <Login />;
 
+  const isBusy = status !== "idle";
+
   return (
-    <div className="container" data-tauri-drag-region>
+    <div className="container">
 
-      {/* ── Prompt input ── */}
-      <div className="input-row" data-tauri-drag-region>
-        <div className="icon-spark">
-          <Sparkles size={22} strokeWidth={2.5} />
-        </div>
-        <textarea
-          ref={inputRef}
-          className="input-field"
-          placeholder="Ask ORIGIN AI anything..."
-          rows={1}
-          onChange={handleInputResize}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-            if (e.key === "Escape") handleClose();
-          }}
-        />
-      </div>
+      {/* ── Scrollable middle area ── */}
+      <div className="scroll-area" ref={scrollAreaRef}>
 
-      {/* ── "ORIGIN is thinking" — compact pulsing glass pill ── */}
-      {isThinking && (
-        <div className="thinking-box">
-          <div className="thinking-dots">
-            <span className="dot-pulse" style={{ animationDelay: "0ms" }} />
-            <span className="dot-pulse" style={{ animationDelay: "160ms" }} />
-            <span className="dot-pulse" style={{ animationDelay: "320ms" }} />
+        {/* ── Prompt input ── */}
+        <div className="input-row" data-tauri-drag-region>
+          <div className="icon-spark">
+            <Sparkles size={22} strokeWidth={2.5} />
           </div>
-          <span className="thinking-label">ORIGIN AI is thinking</span>
+          <textarea
+            ref={inputRef}
+            className="input-field"
+            placeholder="Ask ORIGIN AI anything…"
+            rows={1}
+            onChange={handleInputResize}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+              if (e.key === "Escape") handleClose();
+            }}
+          />
         </div>
-      )}
 
-      {/* ── Streaming response — appears as tokens arrive ── */}
-      {aiResponse && (
-        <div className="response-box" ref={responseRef}>
-          <p className="response-text">{aiResponse}</p>
-        </div>
-      )}
+        {/* ── "ORIGIN is thinking" — shown during both thinking AND streaming ── */}
+        {(status === "thinking" || status === "streaming") && (
+          <div className="thinking-box">
+            <div className="thinking-dots">
+              <span className="dot-pulse" style={{ animationDelay: "0ms" }} />
+              <span className="dot-pulse" style={{ animationDelay: "160ms" }} />
+              <span className="dot-pulse" style={{ animationDelay: "320ms" }} />
+            </div>
+            <span className="thinking-label">
+              {status === "thinking" ? "ORIGIN AI is thinking…" : "ORIGIN AI is responding…"}
+            </span>
+          </div>
+        )}
+
+        {/* ── Streaming response ── */}
+        {aiResponse && (
+          <div className="response-box" ref={responseRef}>
+            <p className="response-text">{aiResponse}</p>
+          </div>
+        )}
+      </div>
 
       <div className="divider" />
 
-      {/* ── Bottom bar ── */}
+      {/* ── Bottom bar — always visible, never scrolls away ── */}
       <div className="bottom-row" data-tauri-drag-region>
         <div className="tags">
           <div className="tag">
             <Sparkles size={16} className="tag-icon" />
             <span>ORIGIN AI</span>
-            <div className="dot-small"></div>
+            <div className="dot-small" />
           </div>
         </div>
 
         <div className="actions">
+          {/* Sign-out button */}
+          <button
+            className="btn-sign-out"
+            onClick={handleSignOut}
+            title="Sign out (/sign-out)"
+          >
+            <LogOut size={16} />
+          </button>
+
           <button
             className="btn-send"
             onClick={handleSend}
             title="Send"
-            disabled={isThinking}
+            disabled={isBusy}
           >
-            {isThinking
+            {isBusy
               ? <Loader2 size={20} className="spin-icon" />
               : <Send size={20} style={{ marginLeft: "-2px", marginTop: "2px" }} />
             }

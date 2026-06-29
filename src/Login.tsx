@@ -18,7 +18,21 @@ export function Login() {
     try {
       await signIn("password", { email, password, flow });
     } catch (err: any) {
-      setError(err.message ?? "An error occurred");
+      const msg: string = err.message ?? "";
+      // Convex Auth throws "Could not find account" or similar when email is unknown
+      const isUnknownAccount =
+        flow === "signIn" &&
+        (msg.toLowerCase().includes("could not find") ||
+         msg.toLowerCase().includes("no account") ||
+         msg.toLowerCase().includes("invalid") ||
+         msg.toLowerCase().includes("not found") ||
+         msg.toLowerCase().includes("user not found"));
+
+      if (isUnknownAccount) {
+        setError("__unrecognized_email__");
+      } else {
+        setError(msg || "An error occurred. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -58,7 +72,24 @@ export function Login() {
             />
           </div>
 
-          {error && <div className="error-message">{error}</div>}
+          {error && (
+            <div className="error-message">
+              {error === "__unrecognized_email__" ? (
+                <>
+                  Email not recognized.{" "}
+                  <button
+                    type="button"
+                    className="error-link"
+                    onClick={() => { setFlow("signUp"); setError(null); }}
+                  >
+                    Please sign up →
+                  </button>
+                </>
+              ) : (
+                error
+              )}
+            </div>
+          )}
 
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? "Please wait..." : flow === "signIn" ? "Sign In" : "Sign Up"}

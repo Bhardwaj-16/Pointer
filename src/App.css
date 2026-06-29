@@ -17,7 +17,8 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  padding-top: 40px;
   height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -30,12 +31,12 @@ body {
 ───────────────────────────────────────── */
 .container {
   width: 580px;
+  max-height: calc(100vh - 80px);
   position: relative;
-  padding: 14px 18px 14px 18px;
+  padding: 0;
   border-radius: 28px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   overflow: hidden;
 
   /* Glass base: nearly transparent warm tint */
@@ -121,6 +122,34 @@ body {
 /* ─────────────────────────────────────────
    INPUT ROW
 ───────────────────────────────────────── */
+/* ─────────────────────────────────────────
+   SCROLL AREA — grows, scrolls, never clips
+───────────────────────────────────────── */
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px 10px;
+  min-height: 0;
+}
+
+/* Thin scrollbar inside scroll area */
+.scroll-area::-webkit-scrollbar {
+  width: 4px;
+}
+.scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+}
+
+/* ─────────────────────────────────────────
+   INPUT ROW
+───────────────────────────────────────── */
 .input-row {
   position: relative;
   z-index: 1;
@@ -182,10 +211,12 @@ body {
 .bottom-row {
   position: relative;
   z-index: 1;
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 4px;
+  padding: 10px 22px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .tags {
@@ -263,6 +294,36 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Sign-out ghost button */
+.btn-sign-out {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.45);
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-sign-out:hover {
+  background: rgba(255, 80, 60, 0.18);
+  border-color: rgba(255, 100, 80, 0.35);
+  color: rgba(255, 160, 140, 0.9);
+}
+
+.btn-sign-out:active {
+  transform: scale(0.95);
 }
 
 /* Liquid glass orange send button */
@@ -349,18 +410,7 @@ body {
    DIVIDER between rows
 ───────────────────────────────────────── */
 .divider {
-  position: relative;
-  z-index: 1;
-  height: 1px;
-  margin: 0 4px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.15) 20%,
-    rgba(255, 255, 255, 0.2) 50%,
-    rgba(255, 255, 255, 0.15) 80%,
-    transparent
-  );
+  display: none;
 }
 
 /* ─────────────────────────────────────────
