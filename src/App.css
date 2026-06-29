@@ -368,12 +368,25 @@ body {
 ───────────────────────────────────────── */
 .input-field {
   resize: none;
-  overflow: hidden;
+  overflow-y: auto;
   min-height: 26px;
+  max-height: 120px;
   line-height: 1.5;
   padding: 2px 0;
   transition: height 0.15s ease;
   vertical-align: middle;
+}
+
+/* Custom slim scrollbar for input field */
+.input-field::-webkit-scrollbar {
+  width: 4px;
+}
+.input-field::-webkit-scrollbar-track {
+  background: transparent;
+}
+.input-field::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
 }
 
 /* ─────────────────────────────────────────
@@ -441,7 +454,7 @@ body {
   padding: 14px 18px;
   border-radius: 20px;
   margin: 0 4px;
-  max-height: 300px;
+  max-height: 450px;
   overflow-y: auto;
 
   background: rgba(255, 255, 255, 0.05);

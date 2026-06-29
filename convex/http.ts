@@ -88,7 +88,7 @@ http.route({
               Accept: "text/event-stream",
             },
             body: JSON.stringify({
-              model: "qwen/qwen3.5-397b-a17b",
+              model: "meta/llama-3.1-70b-instruct",
               messages: [
                 { role: "system", content: "You are a helpful, concise AI assistant." },
                 { role: "user", content: message },
@@ -98,7 +98,7 @@ http.route({
               top_k: 20,
               presence_penalty: 0,
               repetition_penalty: 1,
-              max_tokens: 16384,
+              max_tokens: 4096,
               stream: true,
             }),
           }
